@@ -15,6 +15,7 @@ package internal
 
 import (
 	"sort"
+	"strings"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -33,6 +34,13 @@ func (s LabelPairSorter) Swap(i, j int) {
 
 func (s LabelPairSorter) Less(i, j int) bool {
 	return s[i].GetName() < s[j].GetName()
+}
+
+// CompareLabelPairNames compares two dto.LabelPair pointers by name. Use it
+// with the slices package in hot paths, as converting a slice to
+// LabelPairSorter for the sort package allocates.
+func CompareLabelPairNames(a, b *dto.LabelPair) int {
+	return strings.Compare(a.GetName(), b.GetName())
 }
 
 // MetricSorter is a sortable slice of *dto.Metric.

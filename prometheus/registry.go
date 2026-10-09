@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -969,11 +970,11 @@ func checkMetricConsistency(
 	h.Write(separatorByteSlice)
 	// Make sure label pairs are sorted. We depend on it for the consistency
 	// check.
-	if !sort.IsSorted(internal.LabelPairSorter(dtoMetric.Label)) {
+	if !slices.IsSortedFunc(dtoMetric.Label, internal.CompareLabelPairNames) {
 		// We cannot sort dtoMetric.Label in place as it is immutable by contract.
 		copiedLabels := make([]*dto.LabelPair, len(dtoMetric.Label))
 		copy(copiedLabels, dtoMetric.Label)
-		sort.Sort(internal.LabelPairSorter(copiedLabels))
+		slices.SortFunc(copiedLabels, internal.CompareLabelPairNames)
 		dtoMetric.Label = copiedLabels
 	}
 	for _, lp := range dtoMetric.Label {

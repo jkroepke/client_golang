@@ -1486,3 +1486,47 @@ func BenchmarkGatherersGather(b *testing.B) {
 		})
 	}
 }
+
+// unsortedLabelsMetric is a Metric whose Write returns the given labels as is,
+// without sorting them.
+type unsortedLabelsMetric struct {
+	desc   *prometheus.Desc
+	labels []*dto.LabelPair
+}
+
+func (m unsortedLabelsMetric) Desc() *prometheus.Desc {
+	return m.desc
+}
+
+func (m unsortedLabelsMetric) Write(out *dto.Metric) error {
+	out.Label = m.labels
+	out.Gauge = &dto.Gauge{Value: proto.Float64(1)}
+	return nil
+}
+
+func TestGatherSortsUnsortedLabels(t *testing.T) {
+	desc := prometheus.NewDesc("unsorted_labels", "Metric with unsorted labels.", []string{"b", "a"}, nil)
+	labels := []*dto.LabelPair{
+		{Name: new("b"), Value: new("2")},
+		{Name: new("a"), Value: new("1")},
+	}
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(prometheus.CollectorFunc(func(ch chan<- prometheus.Metric) {
+		ch <- unsortedLabelsMetric{desc: desc, labels: labels}
+	}))
+
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatalf("unexpected error from Gather: %v", err)
+	}
+	if len(mfs) != 1 || len(mfs[0].GetMetric()) != 1 {
+		t.Fatalf("expected one metric family with one metric, got %v", mfs)
+	}
+	got := mfs[0].GetMetric()[0].GetLabel()
+	if len(got) != 2 || got[0].GetName() != "a" || got[1].GetName() != "b" {
+		t.Errorf("expected labels sorted by name, got %v", got)
+	}
+	if labels[0].GetName() != "b" || labels[1].GetName() != "a" {
+		t.Errorf("Gather sorted the labels of the collected metric in place: %v", labels)
+	}
+}
